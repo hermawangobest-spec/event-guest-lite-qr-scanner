@@ -1,21 +1,202 @@
 <!doctype html>
 <html lang="id">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Event Guest Lite — QR Scanner</title>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<style>
-:root{font-family:Inter,system-ui,-apple-system,Segoe UI,Arial,sans-serif;color:#172033;background:#f3f6fc}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px}.card{width:min(100%,560px);background:#fff;border:1px solid #dbe4f2;border-radius:24px;box-shadow:0 18px 55px #17255418;overflow:hidden}.head{background:#172554;color:#fff;padding:24px}.brand{font-size:12px;letter-spacing:.12em;color:#bfdbfe;font-weight:800}.head h1{margin:8px 0;font-size:26px}.head p{margin:0;color:#dbeafe;font-size:14px}.body{padding:22px}.notice{border-radius:12px;padding:12px 14px;background:#eff6ff;color:#1d4ed8;font-size:14px;line-height:1.5;margin-bottom:16px}#reader{width:100%;overflow:hidden;border:1px dashed #93c5fd;border-radius:16px;padding:8px;min-height:150px}button,.btn{border:0;border-radius:12px;padding:13px 17px;font-weight:750;font-size:15px;cursor:pointer;text-decoration:none;display:inline-flex;justify-content:center;align-items:center;gap:8px}.primary{color:#fff;background:linear-gradient(120deg,#2563eb,#4f46e5);box-shadow:0 5px 14px #2563eb2c}.secondary{background:#eef2ff;color:#3730a3}.actions{display:flex;gap:10px;flex-wrap:wrap;margin:15px 0}.actions>*{flex:1}label{display:block;font-weight:700;font-size:13px;margin:18px 0 7px}input{width:100%;border:1px solid #cbd5e1;border-radius:11px;padding:12px;font:inherit}.muted{font-size:12px;color:#64748b;line-height:1.5}.result{display:none;margin-top:14px;padding:14px;border-radius:12px;overflow-wrap:anywhere}.success{display:block;background:#dcfce7;color:#166534}.error{display:block;background:#fee2e2;color:#991b1b}.footer{padding:0 22px 22px}.small{font-size:12px;color:#64748b}@media(max-width:420px){.head h1{font-size:23px}.body{padding:16px}.actions>*{flex-basis:100%}}
-</style></head>
-<body><main class="card"><header class="head"><div class="brand">EVENT GUEST LITE</div><h1>QR Check-in Scanner</h1><p>Pindai QR tamu, lalu lanjutkan validasi di aplikasi Event Guest Lite.</p></header><section class="body"><div class="notice">Gunakan kamera belakang HP jika tersedia. Setelah QR terbaca, halaman akan mengarahkan Anda ke aplikasi untuk login dan menyimpan check-in.</div><div id="reader"></div><div class="actions"><button class="primary" id="startBtn" onclick="startScan()">Mulai Kamera</button><button class="secondary" onclick="stopScan()">Hentikan</button></div><label for="manual">Atau tempel link undangan / token</label><input id="manual" placeholder="Tempel link undangan atau token QR"><div class="actions"><button class="secondary" onclick="openToken()">Lanjutkan ke Check-in</button></div><div id="result" class="result"></div></section><footer class="footer"><div class="small">Kamera memerlukan HTTPS dan izin browser. PIN admin tidak disimpan atau dikirim ke halaman scanner ini.</div></footer></main>
-<script>
-// GANTI nilai ini dengan URL Web App Apps Script milik Anda (akhiran /exec).
-const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxMRjGOXqroUcP6WHmH39iJ7XqbTI0kFMssN8IuJfB-uTYVu-in-WwSjARGe-GRYluRqQ/exec';
-let qrScanner=null, busy=false;
-function show(message,ok=false){const n=document.getElementById('result');n.textContent=message;n.className='result '+(ok?'success':'error')}
-function extractToken(raw){raw=String(raw||'').trim();if(!raw)throw new Error('QR/token masih kosong.');try{const u=new URL(raw);const t=u.searchParams.get('inv')||u.searchParams.get('scan');if(t)return t;}catch(e){}if(/^https?:\/\//i.test(raw))throw new Error('Link tidak memiliki parameter undangan (?inv=...).');return raw}
-function continueToApp(token){if(!GAS_WEB_APP_URL.startsWith('https://script.google.com/macros/s/')||!GAS_WEB_APP_URL.endsWith('/exec')){busy=false;show('URL Web App belum diatur. Edit GAS_WEB_APP_URL pada index.html dengan URL deployment Apps Script yang berakhiran /exec, lalu Commit changes.');return}const target=GAS_WEB_APP_URL+'?scan='+encodeURIComponent(token);window.location.href=target}
-async function startScan(){if(!window.Html5Qrcode){show('Library scanner belum termuat. Periksa koneksi internet.');return}try{await stopScan();qrScanner=new Html5Qrcode('reader');await qrScanner.start({facingMode:'environment'},{fps:10,qrbox:{width:240,height:240}},async decoded=>{if(busy)return;busy=true;try{const token=extractToken(decoded);document.getElementById('manual').value=token;show('QR berhasil dibaca. Mengarahkan ke aplikasi check-in...',true);await stopScan();continueToApp(token)}catch(e){show(e.message);busy=false}},()=>{});document.getElementById('startBtn').textContent='Kamera Aktif';show('Kamera aktif. Arahkan QR undangan ke kamera.',true);}catch(e){show('Kamera gagal dibuka: '+(e&&e.message?e.message:String(e))+'. Jika izin sudah Allow, muat ulang halaman dan pastikan tidak ada aplikasi lain yang sedang memakai kamera.');qrScanner=null;document.getElementById('startBtn').textContent='Mulai Kamera'}}
-async function stopScan(){if(qrScanner){try{if(qrScanner.isScanning)await qrScanner.stop();qrScanner.clear()}catch(e){}qrScanner=null}document.getElementById('startBtn').textContent='Mulai Kamera'}
-function openToken(){try{continueToApp(extractToken(document.getElementById('manual').value))}catch(e){show(e.message)}}
-</script></body></html>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Event Guest Lite — QR Scanner</title>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    :root { font-family: Inter, system-ui, -apple-system, Segoe UI, Arial, sans-serif; color:#172033; background:#f3f6fc; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; display:grid; place-items:center; padding:16px; }
+    .card { width:min(100%,620px); background:#fff; border:1px solid #dbe4f2; border-radius:22px; box-shadow:0 18px 55px #17255418; overflow:hidden; }
+    .head { background:#172554; color:#fff; padding:22px; }
+    .brand { font-size:12px; letter-spacing:.12em; color:#bfdbfe; font-weight:800; }
+    h1 { margin:8px 0; font-size:25px; }
+    .head p { margin:0; color:#dbeafe; font-size:14px; line-height:1.5; }
+    .body { padding:20px; }
+    .notice { border-radius:12px; padding:12px 14px; background:#eff6ff; color:#1d4ed8; font-size:14px; line-height:1.5; margin-bottom:14px; }
+    #reader { width:100%; min-height:180px; overflow:hidden; border:1px dashed #93c5fd; border-radius:16px; padding:8px; background:#f8fafc; }
+    #reader video { object-fit:cover; }
+    button { border:0; border-radius:11px; padding:13px 16px; font-weight:750; font-size:15px; cursor:pointer; display:inline-flex; justify-content:center; align-items:center; }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    .primary { color:#fff; background:linear-gradient(120deg,#2563eb,#4f46e5); }
+    .secondary { background:#eef2ff; color:#3730a3; }
+    .actions { display:flex; gap:10px; flex-wrap:wrap; margin:14px 0; }
+    .actions > * { flex:1; min-width:140px; }
+    label { display:block; font-weight:700; font-size:13px; margin:18px 0 7px; }
+    input { width:100%; border:1px solid #cbd5e1; border-radius:11px; padding:12px; font:inherit; }
+    .muted { font-size:12px; color:#64748b; line-height:1.5; }
+    .result { display:block; margin-top:14px; padding:12px 14px; border-radius:12px; overflow-wrap:anywhere; background:#f1f5f9; color:#334155; font-size:14px; line-height:1.5; }
+    .success { background:#dcfce7; color:#166534; }
+    .error { background:#fee2e2; color:#991b1b; }
+    .footer { padding:0 20px 20px; }
+    @media(max-width:420px) { .head {padding:18px}.head h1{font-size:22px}.body{padding:14px}.actions>*{flex-basis:100%} }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <header class="head">
+      <div class="brand">EVENT GUEST LITE</div>
+      <h1>QR Check-in Scanner</h1>
+      <p>Pindai QR undangan, lalu lanjutkan validasi di aplikasi Buku Tamu.</p>
+    </header>
+    <section class="body">
+      <div class="notice">
+        Arahkan seluruh QR ke dalam area kamera. QR undangan yang berisi link dengan parameter <b>?inv=</b> akan dibaca otomatis.
+        Jika kamera aktif tetapi QR belum terbaca, coba dekatkan/perjauh HP dan naikkan kecerahan layarnya.
+      </div>
+
+      <div id="reader"></div>
+      <div class="actions">
+        <button class="primary" id="startBtn" type="button">Mulai Kamera</button>
+        <button class="secondary" id="stopBtn" type="button">Hentikan Kamera</button>
+      </div>
+
+      <label for="manual">Tes manual / alternatif jika scan gagal</label>
+      <input id="manual" autocomplete="off" placeholder="Tempel link undangan lengkap atau token inv">
+      <div class="actions">
+        <button class="secondary" id="openBtn" type="button">Lanjutkan ke Check-in</button>
+      </div>
+      <div id="result" class="result" role="status" aria-live="polite">Status: scanner belum dijalankan.</div>
+      <p class="muted">Jika QR tidak terbaca setelah beberapa percobaan, gunakan tes manual: tempel link undangan lengkap dari menu Undangan &amp; QR. PIN admin tidak diminta di halaman scanner ini.</p>
+    </section>
+    <footer class="footer"><div class="muted">Kamera memerlukan HTTPS dan izin browser. Halaman ini hanya membaca QR dan meneruskan token; data tamu tetap disimpan oleh aplikasi Buku Tamu.</div></footer>
+  </main>
+
+  <script>
+    // URL Web App resmi Buku Tamu. Jangan mengganti jika deployment ini masih digunakan.
+    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxMRjGOXqroUcP6WHmH39iJ7XqbTI0kFMssN8IuJfB-uTYVu-in-WwSjARGe-GRYluRqQ/exec';
+
+    let qrScanner = null;
+    let busy = false;
+    let decodeMisses = 0;
+
+    const resultEl = document.getElementById('result');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const openBtn = document.getElementById('openBtn');
+
+    function show(message, type = 'info') {
+      resultEl.textContent = message;
+      resultEl.className = 'result' + (type === 'success' ? ' success' : type === 'error' ? ' error' : '');
+    }
+
+    function extractToken(raw) {
+      raw = String(raw || '').trim();
+      if (!raw) throw new Error('QR/token masih kosong.');
+      try {
+        const url = new URL(raw);
+        const token = url.searchParams.get('inv') || url.searchParams.get('scan');
+        if (token) return token.trim();
+      } catch (e) {
+        // Input bukan URL; akan diperiksa sebagai token biasa di bawah.
+      }
+      if (/^https?:\/\//i.test(raw)) {
+        throw new Error('Link tidak memiliki parameter undangan ?inv= atau ?scan=.');
+      }
+      // Token manual harus berupa token, bukan teks/link yang tidak dikenali.
+      if (/\s/.test(raw)) throw new Error('Token berisi spasi. Tempel link undangan lengkap atau token saja.');
+      return raw;
+    }
+
+    function continueToApp(token) {
+      if (!GAS_WEB_APP_URL.startsWith('https://script.google.com/macros/s/') || !GAS_WEB_APP_URL.endsWith('/exec')) {
+        busy = false;
+        show('URL Web App belum benar. Periksa GAS_WEB_APP_URL di index.html.', 'error');
+        return;
+      }
+      const target = GAS_WEB_APP_URL + '?scan=' + encodeURIComponent(token);
+      show('Token terbaca. Membuka aplikasi check-in…', 'success');
+      window.location.href = target;
+    }
+
+    async function startScan() {
+      if (!window.Html5Qrcode) {
+        show('Library pemindai QR belum termuat. Periksa koneksi internet lalu muat ulang halaman.', 'error');
+        return;
+      }
+
+      try {
+        await stopScan();
+        busy = false;
+        decodeMisses = 0;
+        qrScanner = new Html5Qrcode('reader', { formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE] });
+
+        // Area baca mengikuti ukuran tampilan kamera, lebih besar daripada kotak tetap 240x240.
+        const config = {
+          fps: 15,
+          qrbox: function(viewfinderWidth, viewfinderHeight) {
+            const side = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.82);
+            return { width: Math.max(180, side), height: Math.max(180, side) };
+          },
+          aspectRatio: 1.0,
+          disableFlip: false
+        };
+
+        await qrScanner.start(
+          { facingMode: 'environment' },
+          config,
+          async function(decodedText) {
+            if (busy) return;
+            busy = true;
+            try {
+              const token = extractToken(decodedText);
+              document.getElementById('manual').value = token;
+              show('QR berhasil dibaca. Mengarahkan ke aplikasi check-in…', 'success');
+              await stopScan();
+              continueToApp(token);
+            } catch (e) {
+              busy = false;
+              show('QR terdeteksi, tetapi isinya tidak dikenali: ' + (e && e.message ? e.message : String(e)), 'error');
+            }
+          },
+          function() {
+            // Callback ini dipanggil saat satu frame belum menemukan QR; itu normal.
+            decodeMisses++;
+            if (decodeMisses === 40) {
+              show('Kamera aktif, tetapi QR belum terdeteksi. Pastikan QR dari HP berada utuh di dalam area kamera, layar HP terang, dan fokus kamera jelas.');
+            }
+          }
+        );
+
+        startBtn.textContent = 'Kamera Aktif';
+        show('Kamera aktif. Arahkan QR undangan dari HP ke area kamera dan tahan stabil.', 'success');
+      } catch (e) {
+        qrScanner = null;
+        startBtn.textContent = 'Mulai Kamera';
+        show('Kamera gagal dibuka: ' + (e && e.message ? e.message : String(e)) + '. Pastikan izin kamera diizinkan dan tidak sedang dipakai aplikasi lain.', 'error');
+      }
+    }
+
+    async function stopScan() {
+      if (qrScanner) {
+        try {
+          if (qrScanner.isScanning) await qrScanner.stop();
+          qrScanner.clear();
+        } catch (e) {
+          // Abaikan error saat menghentikan kamera; lanjutkan pembersihan UI.
+        }
+        qrScanner = null;
+      }
+      startBtn.textContent = 'Mulai Kamera';
+    }
+
+    function openToken() {
+      try {
+        const token = extractToken(document.getElementById('manual').value);
+        continueToApp(token);
+      } catch (e) {
+        show(e && e.message ? e.message : String(e), 'error');
+      }
+    }
+
+    startBtn.addEventListener('click', startScan);
+    stopBtn.addEventListener('click', stopScan);
+    openBtn.addEventListener('click', openToken);
+    window.addEventListener('pagehide', function() {
+      if (qrScanner && qrScanner.isScanning) qrScanner.stop().catch(function(){});
+    });
+  </script>
+</body>
+</html>
