@@ -82,32 +82,41 @@
       resultEl.className = 'result' + (type === 'success' ? ' success' : type === 'error' ? ' error' : '');
     }
 
-    function extractToken(raw) {
+    // Hasil parsing menyimpan token DAN URL Web App asal QR bila QR berisi link.
+    // Ini mencegah scanner mengirim token ke deployment Apps Script yang berbeda.
+    function parseQrInput(raw) {
       raw = String(raw || '').trim();
       if (!raw) throw new Error('QR/token masih kosong.');
       try {
         const url = new URL(raw);
         const token = url.searchParams.get('inv') || url.searchParams.get('scan');
-        if (token) return token.trim();
+        if (token) {
+          if (url.hostname !== 'script.google.com' || !url.pathname.startsWith('/macros/s/') || !url.pathname.endsWith('/exec')) {
+            throw new Error('Link QR bukan URL Web App Google Apps Script yang dikenali.');
+          }
+          return { token: token.trim(), baseUrl: url.origin + url.pathname };
+        }
       } catch (e) {
-        // Input bukan URL; akan diperiksa sebagai token biasa di bawah.
+        if (e && e.message && e.message.indexOf('Link QR bukan') === 0) throw e;
+        // Input bukan URL; diperiksa sebagai token biasa di bawah.
       }
       if (/^https?:\/\//i.test(raw)) {
         throw new Error('Link tidak memiliki parameter undangan ?inv= atau ?scan=.');
       }
-      // Token manual harus berupa token, bukan teks/link yang tidak dikenali.
       if (/\s/.test(raw)) throw new Error('Token berisi spasi. Tempel link undangan lengkap atau token saja.');
-      return raw;
+      return { token: raw, baseUrl: GAS_WEB_APP_URL };
     }
 
-    function continueToApp(token) {
-      if (!GAS_WEB_APP_URL.startsWith('https://script.google.com/macros/s/') || !GAS_WEB_APP_URL.endsWith('/exec')) {
+    function continueToApp(input) {
+      const parsed = typeof input === 'string' ? { token: input, baseUrl: GAS_WEB_APP_URL } : input;
+      const baseUrl = parsed.baseUrl || GAS_WEB_APP_URL;
+      if (!baseUrl.startsWith('https://script.google.com/macros/s/') || !baseUrl.endsWith('/exec')) {
         busy = false;
-        show('URL Web App belum benar. Periksa GAS_WEB_APP_URL di index.html.', 'error');
+        show('URL Web App tujuan tidak valid. QR tidak diteruskan.', 'error');
         return;
       }
-      const target = GAS_WEB_APP_URL + '?scan=' + encodeURIComponent(token);
-      show('Token terbaca. Membuka aplikasi check-in…', 'success');
+      const target = baseUrl + '?scan=' + encodeURIComponent(parsed.token);
+      show('Token terbaca. Membuka deployment asal QR untuk check-in…', 'success');
       window.location.href = target;
     }
 
@@ -141,11 +150,11 @@
             if (busy) return;
             busy = true;
             try {
-              const token = extractToken(decodedText);
-              document.getElementById('manual').value = token;
+              const parsed = parseQrInput(decodedText);
+              document.getElementById('manual').value = parsed.token;
               show('QR berhasil dibaca. Mengarahkan ke aplikasi check-in…', 'success');
               await stopScan();
-              continueToApp(token);
+              continueToApp(parsed);
             } catch (e) {
               busy = false;
               show('QR terdeteksi, tetapi isinya tidak dikenali: ' + (e && e.message ? e.message : String(e)), 'error');
@@ -184,8 +193,8 @@
 
     function openToken() {
       try {
-        const token = extractToken(document.getElementById('manual').value);
-        continueToApp(token);
+        const parsed = parseQrInput(document.getElementById('manual').value);
+        continueToApp(parsed);
       } catch (e) {
         show(e && e.message ? e.message : String(e), 'error');
       }
