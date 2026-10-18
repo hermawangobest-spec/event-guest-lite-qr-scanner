@@ -39,7 +39,7 @@
     <header class="head">
       <div class="brand">EVENT GUEST LITE</div>
       <h1>QR Check-in Scanner</h1>
-      <p>Pindai QR undangan, lalu lanjutkan validasi di aplikasi Buku Tamu.</p>
+      <p>Pindai QR undangan satu per satu. Scanner berjalan di panel aplikasi utama; setiap tamu diproses otomatis dan kamera siap untuk QR berikutnya.</p>
     </header>
     <section class="body">
       <div class="notice">
@@ -106,9 +106,48 @@
         show('URL Web App belum benar. Periksa GAS_WEB_APP_URL di index.html.', 'error');
         return;
       }
-      const target = GAS_WEB_APP_URL + '?scan=' + encodeURIComponent(token);
-      show('Token terbaca. Membuka aplikasi check-in…', 'success');
-      window.location.href = target;
+      // Mode utama: scanner tertanam di iframe aplikasi Buku Tamu. Kirim token
+      // ke parent tanpa mengubah URL atau memuat ulang aplikasi.
+      const embedded = window.parent && window.parent !== window;
+      const targetWindow = embedded ? window.parent : (window.opener && !window.opener.closed ? window.opener : null);
+      if (targetWindow) {
+        show('QR terbaca. Mengirim token untuk validasi dan penyimpanan check-in…', 'success');
+        let answered = false;
+        const onResult = function(event) {
+          const allowedOrigin = /^https:\/\/[a-z0-9.-]*script\.googleusercontent\.com$/.test(event.origin) || /^https:\/\/script\.google\.com$/.test(event.origin);
+          if (event.source !== targetWindow || !allowedOrigin || !event.data || event.data.type !== 'EGL_SCAN_RESULT') return;
+          if (event.data.token && event.data.token !== token) return;
+          answered = true;
+          window.removeEventListener('message', onResult);
+          const msg = event.data.ok
+            ? '✓ ' + (event.data.guest_name || 'Tamu') + ' berhasil check-in. Siap scan tamu berikutnya.'
+            : 'Check-in gagal: ' + (event.data.message || 'Periksa status aplikasi.') + ' Kamera akan siap untuk scan berikutnya.';
+          show(msg, event.data.ok ? 'success' : 'error');
+          setTimeout(function() {
+            busy = false;
+            startScan().catch(function(e) { show('Hasil scan diterima, tetapi kamera belum aktif kembali: ' + (e.message || e), 'error'); });
+          }, 700);
+        };
+        window.addEventListener('message', onResult);
+        try { targetWindow.postMessage({type:'EGL_SCAN_TOKEN', token:token}, '*'); }
+        catch (e) {
+          window.removeEventListener('message', onResult);
+          busy = false;
+          show('Tidak dapat mengirim token ke aplikasi. Tutup panel dan buka scanner dari aplikasi Buku Tamu.', 'error');
+          return;
+        }
+        setTimeout(function() {
+          if (!answered) {
+            window.removeEventListener('message', onResult);
+            busy = false;
+            show('Aplikasi belum memberi jawaban. Pastikan login aktif dan acara sudah dipilih. Kamera akan siap kembali.', 'error');
+            setTimeout(function(){ startScan().catch(function(){}); }, 700);
+          }
+        }, 20000);
+        return;
+      }
+      // Fallback jika halaman scanner dibuka langsung, tanpa aplikasi induk.
+      window.location.href = GAS_WEB_APP_URL + '?scan=' + encodeURIComponent(token);
     }
 
     async function startScan() {
@@ -143,7 +182,7 @@
             try {
               const token = extractToken(decodedText);
               document.getElementById('manual').value = token;
-              show('QR berhasil dibaca. Mengarahkan ke aplikasi check-in…', 'success');
+              show('QR berhasil dibaca. Mengirim ke aplikasi check-in…', 'success');
               await stopScan();
               continueToApp(token);
             } catch (e) {
