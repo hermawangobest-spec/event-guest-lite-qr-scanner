@@ -66,7 +66,7 @@
 
   <script>
     // URL Web App resmi Buku Tamu. Jangan mengganti jika deployment ini masih digunakan.
-    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxMRjGOXqroUcP6WHmH39iJ7XqbTI0kFMssN8IuJfB-uTYVu-in-WwSjARGe-GRYluRqQ/exec';
+    const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwn6fBLZlxf16CFrUWwfdeCuu0rcogbhjxIdIUKg3FS_07_bWz7SdsfspxmVsScT0fvRg/exec';
 
     let qrScanner = null;
     let busy = false;
@@ -82,41 +82,32 @@
       resultEl.className = 'result' + (type === 'success' ? ' success' : type === 'error' ? ' error' : '');
     }
 
-    // Hasil parsing menyimpan token DAN URL Web App asal QR bila QR berisi link.
-    // Ini mencegah scanner mengirim token ke deployment Apps Script yang berbeda.
-    function parseQrInput(raw) {
+    function extractToken(raw) {
       raw = String(raw || '').trim();
       if (!raw) throw new Error('QR/token masih kosong.');
       try {
         const url = new URL(raw);
         const token = url.searchParams.get('inv') || url.searchParams.get('scan');
-        if (token) {
-          if (url.hostname !== 'script.google.com' || !url.pathname.startsWith('/macros/s/') || !url.pathname.endsWith('/exec')) {
-            throw new Error('Link QR bukan URL Web App Google Apps Script yang dikenali.');
-          }
-          return { token: token.trim(), baseUrl: url.origin + url.pathname };
-        }
+        if (token) return token.trim();
       } catch (e) {
-        if (e && e.message && e.message.indexOf('Link QR bukan') === 0) throw e;
-        // Input bukan URL; diperiksa sebagai token biasa di bawah.
+        // Input bukan URL; akan diperiksa sebagai token biasa di bawah.
       }
       if (/^https?:\/\//i.test(raw)) {
         throw new Error('Link tidak memiliki parameter undangan ?inv= atau ?scan=.');
       }
+      // Token manual harus berupa token, bukan teks/link yang tidak dikenali.
       if (/\s/.test(raw)) throw new Error('Token berisi spasi. Tempel link undangan lengkap atau token saja.');
-      return { token: raw, baseUrl: GAS_WEB_APP_URL };
+      return raw;
     }
 
-    function continueToApp(input) {
-      const parsed = typeof input === 'string' ? { token: input, baseUrl: GAS_WEB_APP_URL } : input;
-      const baseUrl = parsed.baseUrl || GAS_WEB_APP_URL;
-      if (!baseUrl.startsWith('https://script.google.com/macros/s/') || !baseUrl.endsWith('/exec')) {
+    function continueToApp(token) {
+      if (!GAS_WEB_APP_URL.startsWith('https://script.google.com/macros/s/') || !GAS_WEB_APP_URL.endsWith('/exec')) {
         busy = false;
-        show('URL Web App tujuan tidak valid. QR tidak diteruskan.', 'error');
+        show('URL Web App belum benar. Periksa GAS_WEB_APP_URL di index.html.', 'error');
         return;
       }
-      const target = baseUrl + '?scan=' + encodeURIComponent(parsed.token);
-      show('Token terbaca. Membuka deployment asal QR untuk check-in…', 'success');
+      const target = GAS_WEB_APP_URL + '?scan=' + encodeURIComponent(token);
+      show('Token terbaca. Membuka aplikasi check-in…', 'success');
       window.location.href = target;
     }
 
@@ -150,11 +141,11 @@
             if (busy) return;
             busy = true;
             try {
-              const parsed = parseQrInput(decodedText);
-              document.getElementById('manual').value = parsed.token;
+              const token = extractToken(decodedText);
+              document.getElementById('manual').value = token;
               show('QR berhasil dibaca. Mengarahkan ke aplikasi check-in…', 'success');
               await stopScan();
-              continueToApp(parsed);
+              continueToApp(token);
             } catch (e) {
               busy = false;
               show('QR terdeteksi, tetapi isinya tidak dikenali: ' + (e && e.message ? e.message : String(e)), 'error');
@@ -193,8 +184,8 @@
 
     function openToken() {
       try {
-        const parsed = parseQrInput(document.getElementById('manual').value);
-        continueToApp(parsed);
+        const token = extractToken(document.getElementById('manual').value);
+        continueToApp(token);
       } catch (e) {
         show(e && e.message ? e.message : String(e), 'error');
       }
